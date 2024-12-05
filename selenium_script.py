@@ -151,73 +151,85 @@ new_iframe = WebDriverWait(driver, 10).until(
 )
 driver.switch_to.frame(new_iframe)
 
-challenge_text = driver.find_element(By.CSS_SELECTOR, 'div[id="rc-imageselect"] strong')
-challenge_text_check = driver.find_element(By.CSS_SELECTOR, 'div[id="rc-imageselect"]')
-print("checking--------------------------->",challenge_text_check.text)
-print("Extracted text:", challenge_text.text)
 
-target_label = challenge_text.text.strip()
+while True:
+    time.sleep(2)
+    challenge_text = driver.find_element(By.CSS_SELECTOR, 'div[id="rc-imageselect"] strong')
+    challenge_text_check = driver.find_element(By.CSS_SELECTOR, 'div[id="rc-imageselect"]')
+    print("checking--------------------------->",challenge_text_check.text)
+    print("Extracted text:", challenge_text.text)
+    new_challenge_btn = driver.find_element(By.CSS_SELECTOR, 'div[class="rc-buttons"] button[title="Get a new challenge"]')
 
-# Check if the extracted label matches any value in COCO_LABELS
-if target_label.lower() in [label.lower() for label in COCO_LABELS.values()] and "Verify" not in challenge_text_check.text:
-    image_element = driver.find_element(By.CSS_SELECTOR, 'div[class="rc-imageselect-challenge"] img')
-    image_url = image_element.get_attribute("src")
-    print(f"Image URL: {image_url}")
-
-    # Download the image using requests
-    response = requests.get(image_url)
-
-    # Save the image to a file
-    if response.status_code == 200:
-        with open("downloaded_image.jpg", "wb") as file:
-            file.write(response.content)
-            print("Image downloaded successfully.")
+    target_label = challenge_text.text.strip()
+    if "verify" in challenge_text_check.text.lower():
+        new_challenge_btn.click()
+        print("getting new challenge")
     else:
-        print("Failed to download the image.")
+        if (target_label.lower() in [label.lower() for label in COCO_LABELS.values()]):
+            image_element = driver.find_element(By.CSS_SELECTOR, 'div[class="rc-imageselect-challenge"] img')
+            image_url = image_element.get_attribute("src")
+            print(f"Image URL: {image_url}")
+
+            # Download the image using requests
+            response = requests.get(image_url)
+
+            # Save the image to a file
+            if response.status_code == 200:
+                with open("downloaded_image.jpg", "wb") as file:
+                    file.write(response.content)
+                    print("Image downloaded successfully.")
+            else:
+                print("Failed to download the image.")
 
 
-    # Load image and preprocess
-    image_path = "downloaded_image.jpg"
-    # image_path = "payload (3).jpg"  # Image downloaded from Selenium script
-    original_image, input_tensor = load_image(image_path)
+            # Load image and preprocess
+            image_path = "downloaded_image.jpg"
+            # image_path = "payload (3).jpg"  # Image downloaded from Selenium script
+            original_image, input_tensor = load_image(image_path)
 
-    # Run object detection
-    print("Running detection...")
-    detections = model(input_tensor)
+            # Run object detection
+            print("Running detection...")
+            detections = model(input_tensor)
 
-    # Extract detection results
-    boxes = detections["detection_boxes"].numpy()[0]
-    class_ids = detections["detection_classes"].numpy()[0].astype(int)
-    scores = detections["detection_scores"].numpy()[0]
+            # Extract detection results
+            boxes = detections["detection_boxes"].numpy()[0]
+            class_ids = detections["detection_classes"].numpy()[0].astype(int)
+            scores = detections["detection_scores"].numpy()[0]
 
-    # Draw results on the image and get detected labels
-    result_image, detected_labels = draw_boxes(original_image, boxes, class_ids, scores)
+            # Draw results on the image and get detected labels
+            result_image, detected_labels = draw_boxes(original_image, boxes, class_ids, scores)
 
-    print(f"Target label '{target_label}' is valid. Proceeding with detection.")
-    
-    # Match detected labels to grid positions for the target label
-    grid_size = calculate_grid(original_image.shape[1], original_image.shape[0])
-    grid_positions = match_labels_to_grid(detected_labels, original_image.shape[1], original_image.shape[0], target_label)
-    print(f"Grid positions for '{target_label}': {grid_positions}")
+            print(f"Target label '{target_label}' is valid. Proceeding with detection.")
+            
+            # Match detected labels to grid positions for the target label
+            grid_size = calculate_grid(original_image.shape[1], original_image.shape[0])
+            grid_positions = match_labels_to_grid(detected_labels, original_image.shape[1], original_image.shape[0], target_label)
+            print(f"Grid positions for '{target_label}': {grid_positions}")
 
-    # Draw grid and highlight the target positions
-    highlighted_image = draw_grid_and_highlight(original_image.copy(), grid_size, grid_positions, original_image.shape[1], original_image.shape[0])
+            # Draw grid and highlight the target positions
+            highlighted_image = draw_grid_and_highlight(original_image.copy(), grid_size, grid_positions, original_image.shape[1], original_image.shape[0])
+            # plt.figure(figsize=(10, 10))
+            # plt.imshow(cv2.cvtColor(highlighted_image, cv2.COLOR_BGR2RGB))
+            # plt.title(f"Detected Objects with '{target_label}' Highlighted")
+            # plt.axis('off')  # Turn off axis
+            # plt.show()
 
-    # Display the final image with highlighted tiles
-    plt.figure(figsize=(10, 10))
-    plt.imshow(cv2.cvtColor(highlighted_image, cv2.COLOR_BGR2RGB))
-    plt.axis("off")
-    plt.show()
-    for i in range(grid_size+1):
-        if i in grid_positions:
-            img_btns = driver.find_elements(By.CSS_SELECTOR, f'table[class="rc-imageselect-table-44"] td[tabindex="{i+4}"]')
-            print(i+4)
-        # if i in grid_positions:
-            # [img_btn.click() for img_btn in img_btns]
-            for img_btn in img_btns:
-                img_btn.click()
+            for i in range(grid_size+1):
+                if i in grid_positions:
+                    img_btns = driver.find_elements(By.CSS_SELECTOR, f'table[class="rc-imageselect-table-44"] td[tabindex="{i+4}"]')
+                    print(i+4)
+                # if i in grid_positions:
+                    # [img_btn.click() for img_btn in img_btns]
+                    for img_btn in img_btns:
+                        img_btn.click()
+                    time.sleep(1)
+            verify_btn = driver.find_element(By.CSS_SELECTOR,'div[class="verify-button-holder"] button')
+            verify_btn.click()
+        else:
+            new_challenge_btn.click()
+            print(f"Target label '{target_label}' is not a valid COCO label. Exiting the script.")
 
-            time.sleep(1)
+time.sleep(10)
+driver.close()
 
-else:
-    print(f"Target label '{target_label}' is not a valid COCO label. Exiting the script.")
+
